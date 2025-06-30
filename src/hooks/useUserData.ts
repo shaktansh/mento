@@ -21,16 +21,37 @@ export function useUserData(authUser: User | null) {
     if (!authUser) return;
 
     try {
-      // Load user profile
-      const { data: profile } = await supabase
+      // Load user profile - use limit(1) instead of single() to avoid error when no rows exist
+      const { data: profiles } = await supabase
         .from('users')
         .select('*')
         .eq('id', authUser.id)
-        .single();
+        .limit(1);
 
+      let profile = profiles?.[0];
+
+      // If no profile exists, create a default one
       if (!profile) {
-        setLoading(false);
-        return;
+        const defaultName = authUser.email?.split('@')[0] || 'User';
+        
+        const { data: newProfile, error } = await supabase
+          .from('users')
+          .insert({
+            id: authUser.id,
+            name: defaultName,
+            mode: 'solo',
+            daily_reminder_time: '09:00'
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Error creating user profile:', error);
+          setLoading(false);
+          return;
+        }
+
+        profile = newProfile;
       }
 
       // Load mood history
