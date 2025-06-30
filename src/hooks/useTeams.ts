@@ -42,7 +42,7 @@ export function useTeams(authUser: User | null) {
 
     try {
       // Load teams where user is a member
-      const { data: teamMemberships } = await supabase
+      const { data: teamMemberships, error: membershipError } = await supabase
         .from('team_members')
         .select(`
           team_id,
@@ -58,13 +58,19 @@ export function useTeams(authUser: User | null) {
         `)
         .eq('user_id', authUser.id);
 
-      if (teamMemberships) {
+      if (membershipError) {
+        console.error('Error loading team memberships:', membershipError);
+        setLoading(false);
+        return;
+      }
+
+      if (teamMemberships && teamMemberships.length > 0) {
         const teamsWithMembers = await Promise.all(
           teamMemberships.map(async (membership) => {
             const team = membership.teams;
             
             // Load all members for this team
-            const { data: members } = await supabase
+            const { data: members, error: membersError } = await supabase
               .from('team_members')
               .select(`
                 id,
@@ -76,6 +82,14 @@ export function useTeams(authUser: User | null) {
                 )
               `)
               .eq('team_id', team.id);
+
+            if (membersError) {
+              console.error('Error loading team members:', membersError);
+              return {
+                ...team,
+                members: []
+              };
+            }
 
             return {
               ...team,
@@ -98,6 +112,9 @@ export function useTeams(authUser: User | null) {
         if (teamsWithMembers.length > 0) {
           setCurrentTeam(teamsWithMembers[0]);
         }
+      } else {
+        setTeams([]);
+        setCurrentTeam(null);
       }
     } catch (error) {
       console.error('Error loading teams:', error);
@@ -111,10 +128,13 @@ export function useTeams(authUser: User | null) {
 
     try {
       // Generate room code using the database function
-      const { data: codeResult } = await supabase
+      const { data: codeResult, error: codeError } = await supabase
         .rpc('generate_room_code');
 
-      if (!codeResult) throw new Error('Failed to generate room code');
+      if (codeError || !codeResult) {
+        console.error('Error generating room code:', codeError);
+        throw new Error('Failed to generate room code');
+      }
 
       // Create team
       const { data: team, error: teamError } = await supabase
@@ -127,7 +147,10 @@ export function useTeams(authUser: User | null) {
         .select()
         .single();
 
-      if (teamError) throw teamError;
+      if (teamError) {
+        console.error('Error creating team:', teamError);
+        throw teamError;
+      }
 
       // Add creator as owner
       const { error: memberError } = await supabase
@@ -138,7 +161,10 @@ export function useTeams(authUser: User | null) {
           role: 'owner'
         });
 
-      if (memberError) throw memberError;
+      if (memberError) {
+        console.error('Error adding team owner:', memberError);
+        throw memberError;
+      }
 
       // Reload teams
       await loadUserTeams();
@@ -154,26 +180,42 @@ export function useTeams(authUser: User | null) {
     if (!authUser) throw new Error('User not authenticated');
 
     try {
-      // Find team by room code
-      const { data: team, error: teamError } = await supabase
-        .from('teams')
-        .select('id, name')
-        .eq('room_code', roomCode.toUpperCase())
-        .single();
-
-      if (teamError || !team) {
-        throw new Error('Invalid room code');
+      const cleanRoomCode = roomCode.trim().toUpperCase();
+      
+      if (!cleanRoomCode) {
+        throw new Error('Please enter a valid room code');
       }
 
+      // Find team by room code - use a more direct approach
+      const { data: teams, error: teamError } = await supabase
+        .from('teams')
+        .select('id, name, room_code')
+        .eq('room_code', cleanRoomCode);
+
+      if (teamError) {
+        console.error('Error finding team:', teamError);
+        throw new Error('Error searching for team');
+      }
+
+      if (!teams || teams.length === 0) {
+        throw new Error('Invalid room code. Please check and try again.');
+      }
+
+      const team = teams[0];
+
       // Check if user is already a member
-      const { data: existingMember } = await supabase
+      const { data: existingMember, error: memberCheckError } = await supabase
         .from('team_members')
         .select('id')
         .eq('team_id', team.id)
-        .eq('user_id', authUser.id)
-        .single();
+        .eq('user_id', authUser.id);
 
-      if (existingMember) {
+      if (memberCheckError) {
+        console.error('Error checking membership:', memberCheckError);
+        throw new Error('Error checking team membership');
+      }
+
+      if (existingMember && existingMember.length > 0) {
         throw new Error('You are already a member of this team');
       }
 
@@ -186,7 +228,10 @@ export function useTeams(authUser: User | null) {
           role: 'member'
         });
 
-      if (memberError) throw memberError;
+      if (memberError) {
+        console.error('Error joining team:', memberError);
+        throw new Error('Failed to join team. Please try again.');
+      }
 
       // Reload teams
       await loadUserTeams();
@@ -208,7 +253,10 @@ export function useTeams(authUser: User | null) {
         .eq('team_id', teamId)
         .eq('user_id', authUser.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error leaving team:', error);
+        throw error;
+      }
 
       // Reload teams
       await loadUserTeams();
