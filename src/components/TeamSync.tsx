@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { ArrowLeft, TrendingUp, Heart, UserPlus, Copy, Users, Settings } from 'lucide-react';
+import { ArrowLeft, TrendingUp, Heart, UserPlus, Copy, Users, Settings, Share2, Link } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useTeams } from '../hooks/useTeams';
 import FloatingBlobs from './FloatingBlobs';
@@ -10,9 +10,10 @@ interface TeamSyncProps {
 
 const TeamSync: React.FC<TeamSyncProps> = ({ onNavigate }) => {
   const { user: authUser } = useAuth();
-  const { teams, currentTeam, loading, setCurrentTeam, leaveTeam } = useTeams(authUser);
+  const { teams, currentTeam, loading, setCurrentTeam, leaveTeam, generateInviteLink } = useTeams(authUser);
   const [showInviteModal, setShowInviteModal] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
+  const [inviteLinkCopied, setInviteLinkCopied] = React.useState(false);
 
   const getMoodEmoji = (mood: number) => {
     if (mood >= 8) return '😊';
@@ -31,6 +32,19 @@ const TeamSync: React.FC<TeamSyncProps> = ({ onNavigate }) => {
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error('Failed to copy room code:', error);
+    }
+  };
+
+  const copyInviteLink = async () => {
+    if (!currentTeam) return;
+    
+    try {
+      const inviteLink = generateInviteLink(currentTeam.id);
+      await navigator.clipboard.writeText(inviteLink);
+      setInviteLinkCopied(true);
+      setTimeout(() => setInviteLinkCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy invite link:', error);
     }
   };
 
@@ -281,23 +295,58 @@ const TeamSync: React.FC<TeamSyncProps> = ({ onNavigate }) => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
           <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md flex flex-col gap-4">
             <h4 className="font-sora font-semibold text-lg text-[#334155]">Invite to {currentTeam.name}</h4>
-            <p className="text-sm text-[#334155]/70">
-              Share this room code with your team members:
-            </p>
-            <div className="flex items-center gap-2 p-3 bg-gray-100 rounded-lg">
-              <span className="font-mono text-lg tracking-widest flex-1 text-center">
-                {currentTeam.room_code}
-              </span>
-              <button
-                onClick={copyRoomCode}
-                className="p-2 bg-[#A5E3D8] text-[#334155] rounded-lg hover:bg-[#8DD3C7] transition-colors"
-              >
-                <Copy className="w-4 h-4" />
-              </button>
+            
+            {/* Room Code Section */}
+            <div>
+              <p className="text-sm text-[#334155]/70 mb-2">
+                Share this room code:
+              </p>
+              <div className="flex items-center gap-2 p-3 bg-gray-100 rounded-lg">
+                <span className="font-mono text-lg tracking-widest flex-1 text-center">
+                  {currentTeam.room_code}
+                </span>
+                <button
+                  onClick={copyRoomCode}
+                  className="p-2 bg-[#A5E3D8] text-[#334155] rounded-lg hover:bg-[#8DD3C7] transition-colors"
+                  title="Copy room code"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+              </div>
+              {copied && <p className="text-xs text-green-600 mt-1">Room code copied!</p>}
             </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-gray-200"></div>
+              <span className="text-sm text-[#334155]/60">OR</span>
+              <div className="flex-1 h-px bg-gray-200"></div>
+            </div>
+
+            {/* Invite Link Section */}
+            <div>
+              <p className="text-sm text-[#334155]/70 mb-2">
+                Share this invite link:
+              </p>
+              <div className="flex items-center gap-2 p-3 bg-gray-100 rounded-lg">
+                <span className="text-sm flex-1 truncate">
+                  {generateInviteLink(currentTeam.id)}
+                </span>
+                <button
+                  onClick={copyInviteLink}
+                  className="p-2 bg-[#A5E3D8] text-[#334155] rounded-lg hover:bg-[#8DD3C7] transition-colors"
+                  title="Copy invite link"
+                >
+                  <Link className="w-4 h-4" />
+                </button>
+              </div>
+              {inviteLinkCopied && <p className="text-xs text-green-600 mt-1">Invite link copied!</p>}
+            </div>
+
             <p className="text-xs text-[#334155]/60">
-              Team members can join by entering this code in "Join a Team Space"
+              Team members can join using either the room code or by clicking the invite link
             </p>
+            
             <button
               className="bg-[#A5E3D8] text-[#334155] px-4 py-2 rounded-lg font-inter font-medium hover:bg-[#8DD3C7]"
               onClick={() => setShowInviteModal(false)}

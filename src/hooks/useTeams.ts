@@ -186,36 +186,36 @@ export function useTeams(authUser: User | null) {
         throw new Error('Please enter a valid room code');
       }
 
-      // Find team by room code - use a more direct approach
-      const { data: teams, error: teamError } = await supabase
+      // Find team by room code with better error handling
+      const { data: teamData, error: teamError } = await supabase
         .from('teams')
-        .select('id, name, room_code')
-        .eq('room_code', cleanRoomCode);
+        .select('id, name, room_code, created_by')
+        .eq('room_code', cleanRoomCode)
+        .maybeSingle();
 
       if (teamError) {
         console.error('Error finding team:', teamError);
-        throw new Error('Error searching for team');
+        throw new Error('Error searching for team. Please try again.');
       }
 
-      if (!teams || teams.length === 0) {
-        throw new Error('Invalid room code. Please check and try again.');
+      if (!teamData) {
+        throw new Error('Invalid room code. Please check the code and try again.');
       }
-
-      const team = teams[0];
 
       // Check if user is already a member
       const { data: existingMember, error: memberCheckError } = await supabase
         .from('team_members')
         .select('id')
-        .eq('team_id', team.id)
-        .eq('user_id', authUser.id);
+        .eq('team_id', teamData.id)
+        .eq('user_id', authUser.id)
+        .maybeSingle();
 
       if (memberCheckError) {
         console.error('Error checking membership:', memberCheckError);
         throw new Error('Error checking team membership');
       }
 
-      if (existingMember && existingMember.length > 0) {
+      if (existingMember) {
         throw new Error('You are already a member of this team');
       }
 
@@ -223,7 +223,7 @@ export function useTeams(authUser: User | null) {
       const { error: memberError } = await supabase
         .from('team_members')
         .insert({
-          team_id: team.id,
+          team_id: teamData.id,
           user_id: authUser.id,
           role: 'member'
         });
@@ -236,9 +236,65 @@ export function useTeams(authUser: User | null) {
       // Reload teams
       await loadUserTeams();
 
-      return team;
+      return teamData;
     } catch (error) {
       console.error('Error joining team:', error);
+      throw error;
+    }
+  };
+
+  const joinTeamByInvite = async (teamId: string) => {
+    if (!authUser) throw new Error('User not authenticated');
+
+    try {
+      // Verify team exists
+      const { data: teamData, error: teamError } = await supabase
+        .from('teams')
+        .select('id, name, room_code, created_by')
+        .eq('id', teamId)
+        .single();
+
+      if (teamError || !teamData) {
+        throw new Error('Invalid invite link or team no longer exists');
+      }
+
+      // Check if user is already a member
+      const { data: existingMember, error: memberCheckError } = await supabase
+        .from('team_members')
+        .select('id')
+        .eq('team_id', teamData.id)
+        .eq('user_id', authUser.id)
+        .maybeSingle();
+
+      if (memberCheckError) {
+        console.error('Error checking membership:', memberCheckError);
+        throw new Error('Error checking team membership');
+      }
+
+      if (existingMember) {
+        throw new Error('You are already a member of this team');
+      }
+
+      // Add user as member
+      const { error: memberError } = await supabase
+        .from('team_members')
+        .insert({
+          team_id: teamData.id,
+          user_id: authUser.id,
+          role: 'member'
+        });
+
+      if (memberError) {
+        console.error('Error joining team:', memberError);
+        throw new Error('Failed to join team. Please try again.');
+      }
+
+      // Reload teams
+      await loadUserTeams();
+
+      return teamData;
+    } catch (error) {
+      console.error('Error joining team by invite:', error);
       throw error;
     }
   };
@@ -266,14 +322,21 @@ export function useTeams(authUser: User | null) {
     }
   };
 
+  const generateInviteLink = (teamId: string) => {
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/invite/${teamId}`;
+  };
+
   return {
     teams,
     currentTeam,
     loading,
     createTeam,
     joinTeam,
+    joinTeamByInvite,
     leaveTeam,
     refreshTeams: loadUserTeams,
-    setCurrentTeam
+    setCurrentTeam,
+    generateInviteLink
   };
 }

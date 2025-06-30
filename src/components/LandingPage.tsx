@@ -10,7 +10,7 @@ interface LandingPageProps {
 
 const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
   const { user: authUser } = useAuth();
-  const { createTeam, joinTeam } = useTeams(authUser);
+  const { createTeam, joinTeam, joinTeamByInvite } = useTeams(authUser);
   const [showJoinModal, setShowJoinModal] = React.useState(false);
   const [showCreateModal, setShowCreateModal] = React.useState(false);
   const [roomCodeInput, setRoomCodeInput] = React.useState('');
@@ -18,6 +18,34 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
   const [joinError, setJoinError] = React.useState('');
   const [createError, setCreateError] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
+
+  // Check for invite link in URL
+  React.useEffect(() => {
+    const path = window.location.pathname;
+    const inviteMatch = path.match(/\/invite\/([a-f0-9-]+)/);
+    
+    if (inviteMatch && authUser) {
+      const teamId = inviteMatch[1];
+      handleInviteJoin(teamId);
+    }
+  }, [authUser]);
+
+  const handleInviteJoin = async (teamId: string) => {
+    if (!authUser) return;
+
+    setIsLoading(true);
+    try {
+      await joinTeamByInvite(teamId);
+      // Clear the invite from URL
+      window.history.replaceState({}, '', '/');
+      onNavigate('team');
+    } catch (error: any) {
+      console.error('Error joining team via invite:', error);
+      alert(error.message || 'Failed to join team via invite link');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleJoinTeam = async () => {
     if (!roomCodeInput.trim()) {
@@ -155,6 +183,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
               value={roomCodeInput}
               onChange={e => setRoomCodeInput(e.target.value.toUpperCase())}
               disabled={isLoading}
+              maxLength={6}
             />
             {joinError && <div className="text-red-500 text-sm">{joinError}</div>}
             <div className="flex gap-2">
