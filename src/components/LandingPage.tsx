@@ -1,5 +1,7 @@
 import * as React from 'react';
 import { Brain, Users, Zap, Heart, ArrowRight } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
+import { useTeams } from '../hooks/useTeams';
 import FloatingBlobs from './FloatingBlobs';
 
 interface LandingPageProps {
@@ -7,18 +9,55 @@ interface LandingPageProps {
 }
 
 const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
+  const { user: authUser } = useAuth();
+  const { createTeam, joinTeam } = useTeams(authUser);
   const [showJoinModal, setShowJoinModal] = React.useState(false);
+  const [showCreateModal, setShowCreateModal] = React.useState(false);
   const [roomCodeInput, setRoomCodeInput] = React.useState('');
+  const [teamNameInput, setTeamNameInput] = React.useState('');
   const [joinError, setJoinError] = React.useState('');
+  const [createError, setCreateError] = React.useState('');
+  const [isLoading, setIsLoading] = React.useState(false);
 
-  const handleJoinTeam = () => {
-    const savedCode = localStorage.getItem('mento-room-code');
-    if (roomCodeInput.trim().toUpperCase() === savedCode) {
-      setJoinError('');
+  const handleJoinTeam = async () => {
+    if (!roomCodeInput.trim()) {
+      setJoinError('Please enter a room code');
+      return;
+    }
+
+    setIsLoading(true);
+    setJoinError('');
+
+    try {
+      await joinTeam(roomCodeInput.trim());
       setShowJoinModal(false);
+      setRoomCodeInput('');
       onNavigate('team');
-    } else {
-      setJoinError('Invalid room code.');
+    } catch (error: any) {
+      setJoinError(error.message || 'Failed to join team');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCreateTeam = async () => {
+    if (!teamNameInput.trim()) {
+      setCreateError('Please enter a team name');
+      return;
+    }
+
+    setIsLoading(true);
+    setCreateError('');
+
+    try {
+      await createTeam(teamNameInput.trim());
+      setShowCreateModal(false);
+      setTeamNameInput('');
+      onNavigate('team');
+    } catch (error: any) {
+      setCreateError(error.message || 'Failed to create team');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -53,7 +92,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
             <button 
-              onClick={() => onNavigate('team')}
+              onClick={() => setShowCreateModal(true)}
               className="group bg-[#A5E3D8] text-[#334155] px-8 py-4 rounded-2xl font-inter font-medium text-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:bg-[#8DD3C7] hover:scale-105 flex items-center gap-2"
             >
               🧑‍🤝‍🧑 Create a Team Space
@@ -103,28 +142,76 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
         </div>
       </div>
 
+      {/* Join Team Modal */}
       {showJoinModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-xs flex flex-col gap-4">
+          <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md flex flex-col gap-4">
             <h4 className="font-sora font-semibold text-lg text-[#334155]">Join a Team</h4>
+            <p className="text-sm text-[#334155]/70">Enter the room code shared by your team</p>
             <input
               type="text"
-              className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#A5E3D8] font-mono tracking-widest"
+              className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#A5E3D8] font-mono tracking-widest uppercase"
               placeholder="Enter room code"
               value={roomCodeInput}
-              onChange={e => setRoomCodeInput(e.target.value)}
+              onChange={e => setRoomCodeInput(e.target.value.toUpperCase())}
+              disabled={isLoading}
             />
             {joinError && <div className="text-red-500 text-sm">{joinError}</div>}
             <div className="flex gap-2">
               <button
-                className="bg-[#A5E3D8] text-[#334155] px-4 py-2 rounded-lg font-inter font-medium flex-1 hover:bg-[#8DD3C7]"
+                className="bg-[#A5E3D8] text-[#334155] px-4 py-2 rounded-lg font-inter font-medium flex-1 hover:bg-[#8DD3C7] disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={handleJoinTeam}
+                disabled={isLoading}
               >
-                Join
+                {isLoading ? 'Joining...' : 'Join'}
               </button>
               <button
-                className="bg-gray-200 text-[#334155] px-4 py-2 rounded-lg font-inter font-medium flex-1 hover:bg-gray-300"
-                onClick={() => setShowJoinModal(false)}
+                className="bg-gray-200 text-[#334155] px-4 py-2 rounded-lg font-inter font-medium flex-1 hover:bg-gray-300 disabled:opacity-50"
+                onClick={() => {
+                  setShowJoinModal(false);
+                  setRoomCodeInput('');
+                  setJoinError('');
+                }}
+                disabled={isLoading}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Team Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md flex flex-col gap-4">
+            <h4 className="font-sora font-semibold text-lg text-[#334155]">Create a Team</h4>
+            <p className="text-sm text-[#334155]/70">Give your team a name to get started</p>
+            <input
+              type="text"
+              className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#A5E3D8]"
+              placeholder="Enter team name"
+              value={teamNameInput}
+              onChange={e => setTeamNameInput(e.target.value)}
+              disabled={isLoading}
+            />
+            {createError && <div className="text-red-500 text-sm">{createError}</div>}
+            <div className="flex gap-2">
+              <button
+                className="bg-[#A5E3D8] text-[#334155] px-4 py-2 rounded-lg font-inter font-medium flex-1 hover:bg-[#8DD3C7] disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={handleCreateTeam}
+                disabled={isLoading}
+              >
+                {isLoading ? 'Creating...' : 'Create Team'}
+              </button>
+              <button
+                className="bg-gray-200 text-[#334155] px-4 py-2 rounded-lg font-inter font-medium flex-1 hover:bg-gray-300 disabled:opacity-50"
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setTeamNameInput('');
+                  setCreateError('');
+                }}
+                disabled={isLoading}
               >
                 Cancel
               </button>

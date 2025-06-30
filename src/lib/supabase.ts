@@ -33,6 +33,41 @@ export type Database = {
           daily_reminder_time?: string;
         };
       };
+      teams: {
+        Row: {
+          id: string;
+          name: string;
+          room_code: string;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          name: string;
+          room_code: string;
+          created_by: string;
+        };
+        Update: {
+          name?: string;
+        };
+      };
+      team_members: {
+        Row: {
+          id: string;
+          team_id: string;
+          user_id: string;
+          role: 'owner' | 'member';
+          joined_at: string;
+        };
+        Insert: {
+          team_id: string;
+          user_id: string;
+          role?: 'owner' | 'member';
+        };
+        Update: {
+          role?: 'owner' | 'member';
+        };
+      };
       mood_entries: {
         Row: {
           id: string;
@@ -117,6 +152,12 @@ export type Database = {
           mood?: number;
           tags?: string[];
         };
+      };
+    };
+    Functions: {
+      generate_room_code: {
+        Args: {};
+        Returns: string;
       };
     };
   };
