@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import { useAuth } from './hooks/useAuth';
+import { useUserData } from './hooks/useUserData';
+import AuthForm from './components/AuthForm';
 import LandingPage from './components/LandingPage';
 import Dashboard from './components/Dashboard';
 import CheckIn from './components/CheckIn';
@@ -8,39 +11,42 @@ import History from './components/History';
 import Journal from './components/Journal';
 import MentoAI from './components/MentoAI';
 import Navigation from './components/Navigation';
-import { User } from './types';
 
 function App() {
+  const { user: authUser, loading: authLoading, signOut } = useAuth();
+  const { user, loading: userLoading, updateUser, addCheckIn, addJournalEntry, updateJournalEntry, deleteJournalEntry } = useUserData(authUser);
   const [currentView, setCurrentView] = useState<'landing' | 'dashboard' | 'checkin' | 'team' | 'settings' | 'history' | 'journal' | 'mento'>('landing');
-  const [user, setUser] = useState<User>({
-    name: 'Alex',
-    mode: 'solo',
-    dailyReminderTime: '09:00',
-    lastCheckIn: null,
-    moodHistory: [
-      { date: '2024-01-15', mood: 8 },
-      { date: '2024-01-14', mood: 6 },
-      { date: '2024-01-13', mood: 7 },
-      { date: '2024-01-12', mood: 5 },
-      { date: '2024-01-11', mood: 9 },
-      { date: '2024-01-10', mood: 7 },
-      { date: '2024-01-09', mood: 6 }
-    ],
-    energyHistory: [
-      { date: '2024-01-15', energy: 7 },
-      { date: '2024-01-14', energy: 5 },
-      { date: '2024-01-13', energy: 8 },
-      { date: '2024-01-12', energy: 4 },
-      { date: '2024-01-11', energy: 9 },
-      { date: '2024-01-10', energy: 6 },
-      { date: '2024-01-09', energy: 5 }
-    ],
-    journalEntries: []
-  });
 
   const navigateTo = (view: 'landing' | 'dashboard' | 'checkin' | 'team' | 'settings' | 'history' | 'journal' | 'mento') => {
     setCurrentView(view);
   };
+
+  const handleSignOut = async () => {
+    await signOut();
+    setCurrentView('landing');
+  };
+
+  // Show loading screen while checking authentication
+  if (authLoading || (authUser && userLoading)) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#F6F9FC] to-[#E6F0FF] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-[#A5E3D8] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="font-inter text-[#334155]/70">Loading your mind sync...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show auth form if not authenticated
+  if (!authUser) {
+    return <AuthForm />;
+  }
+
+  // Show landing page if user data is not loaded yet
+  if (!user) {
+    return <LandingPage onNavigate={navigateTo} />;
+  }
 
   const renderView = () => {
     switch (currentView) {
@@ -49,19 +55,25 @@ function App() {
       case 'dashboard':
         return <Dashboard user={user} />;
       case 'checkin':
-        return <CheckIn user={user} setUser={setUser} onNavigate={navigateTo} />;
+        return <CheckIn user={user} onCheckIn={addCheckIn} onNavigate={navigateTo} />;
       case 'team':
         return <TeamSync onNavigate={navigateTo} />;
       case 'settings':
-        return <Settings user={user} setUser={setUser} onNavigate={navigateTo} />;
+        return <Settings user={user} updateUser={updateUser} onNavigate={navigateTo} onSignOut={handleSignOut} />;
       case 'history':
         return <History user={user} onNavigate={navigateTo} />;
       case 'journal':
-        return <Journal user={user} setUser={setUser} onNavigate={navigateTo} />;
+        return <Journal 
+          user={user} 
+          onAddEntry={addJournalEntry}
+          onUpdateEntry={updateJournalEntry}
+          onDeleteEntry={deleteJournalEntry}
+          onNavigate={navigateTo} 
+        />;
       case 'mento':
         return <MentoAI user={user} onNavigate={navigateTo} />;
       default:
-        return <LandingPage onNavigate={navigateTo} />;
+        return <Dashboard user={user} />;
     }
   };
 

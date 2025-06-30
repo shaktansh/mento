@@ -40,6 +40,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   };
 
   const getStreakDays = () => {
+    if (user.moodHistory.length === 0) return 0;
+    
     const today = new Date().toISOString().split('T')[0];
     let streak = 0;
     
@@ -66,6 +68,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const streakDays = getStreakDays();
 
   const getInsightMessage = () => {
+    if (user.moodHistory.length === 0 && user.energyHistory.length === 0) {
+      return "Welcome to Mento! Start by doing your first check-in to begin tracking your mental wellness journey.";
+    }
+    
     const avgMood = weeklyMoodAvg;
     const avgEnergy = weeklyEnergyAvg;
     
@@ -81,6 +87,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   };
 
   const getNudgeMessage = () => {
+    if (user.moodHistory.length === 0) {
+      return "Take your first check-in to start understanding your mental wellness patterns.";
+    }
+    
     const recentMood = user.lastCheckIn?.mood || weeklyMoodAvg;
     const recentEnergy = user.lastCheckIn?.energy || weeklyEnergyAvg;
     
@@ -95,6 +105,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     }
   };
 
+  const hasData = user.moodHistory.length > 0 || user.energyHistory.length > 0;
+
   return (
     <div className="relative min-h-screen lg:pl-72">
       <FloatingBlobs />
@@ -106,7 +118,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
             Welcome back, {user.name} 👋
           </h1>
           <p className="font-inter text-lg text-[#334155]/70">
-            Here's how your mind has been syncing lately
+            {hasData ? "Here's how your mind has been syncing lately" : "Ready to start your mental wellness journey?"}
           </p>
         </div>
         
@@ -116,10 +128,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           <div className="bg-white/20 backdrop-blur-sm p-6 rounded-3xl border border-white/30 shadow-lg">
             <div className="flex items-center justify-between mb-3">
               <Brain className="w-6 h-6 text-[#A5E3D8]" />
-              <div className="text-2xl">{getMoodEmoji(user.lastCheckIn?.mood || weeklyMoodAvg)}</div>
+              <div className="text-2xl">
+                {hasData ? getMoodEmoji(user.lastCheckIn?.mood || weeklyMoodAvg) : '🤔'}
+              </div>
             </div>
             <div className="text-2xl font-sora font-bold text-[#334155] mb-1">
-              {user.lastCheckIn?.mood || Math.round(weeklyMoodAvg)}/10
+              {hasData ? `${user.lastCheckIn?.mood || Math.round(weeklyMoodAvg)}/10` : '--'}
             </div>
             <p className="font-inter text-sm text-[#334155]/70">Current Mood</p>
           </div>
@@ -131,7 +145,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
               <div className="text-2xl">⚡</div>
             </div>
             <div className="text-2xl font-sora font-bold text-[#334155] mb-1">
-              {user.lastCheckIn?.energy || Math.round(weeklyEnergyAvg)}/10
+              {hasData ? `${user.lastCheckIn?.energy || Math.round(weeklyEnergyAvg)}/10` : '--'}
             </div>
             <p className="font-inter text-sm text-[#334155]/70">Energy Level</p>
           </div>
@@ -161,76 +175,91 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           </div>
         </div>
 
-        {/* Weekly Analysis */}
-        <div className="grid md:grid-cols-2 gap-6 mb-8">
-          {/* Mood Analysis */}
-          <div className="bg-white/20 backdrop-blur-sm p-8 rounded-3xl border border-white/30 shadow-lg">
-            <div className="flex items-center gap-3 mb-6">
-              <Brain className="w-6 h-6 text-[#A5E3D8]" />
-              <h3 className="font-sora font-semibold text-xl text-[#334155]">Mood Analysis</h3>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="font-inter text-[#334155]/70">7-day average</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">{getMoodEmoji(weeklyMoodAvg)}</span>
-                  <span className="font-sora font-bold text-[#A5E3D8]">{weeklyMoodAvg}/10</span>
+        {hasData ? (
+          <>
+            {/* Weekly Analysis */}
+            <div className="grid md:grid-cols-2 gap-6 mb-8">
+              {/* Mood Analysis */}
+              <div className="bg-white/20 backdrop-blur-sm p-8 rounded-3xl border border-white/30 shadow-lg">
+                <div className="flex items-center gap-3 mb-6">
+                  <Brain className="w-6 h-6 text-[#A5E3D8]" />
+                  <h3 className="font-sora font-semibold text-xl text-[#334155]">Mood Analysis</h3>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-inter text-[#334155]/70">7-day average</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">{getMoodEmoji(weeklyMoodAvg)}</span>
+                      <span className="font-sora font-bold text-[#A5E3D8]">{weeklyMoodAvg}/10</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="font-inter text-[#334155]/70">Trend</span>
+                    <div className="flex items-center gap-2">
+                      {moodTrend === 'improving' && <span className="text-green-500">📈 Improving</span>}
+                      {moodTrend === 'declining' && <span className="text-orange-500">📉 Needs attention</span>}
+                      {moodTrend === 'stable' && <span className="text-blue-500">➡️ Stable</span>}
+                    </div>
+                  </div>
+                  
+                  <div className="w-full bg-gray-200 rounded-full h-3 mt-4">
+                    <div 
+                      className="bg-gradient-to-r from-[#A5E3D8] to-[#8DD3C7] h-3 rounded-full transition-all duration-500"
+                      style={{ width: `${(weeklyMoodAvg / 10) * 100}%` }}
+                    />
+                  </div>
                 </div>
               </div>
               
-              <div className="flex items-center justify-between">
-                <span className="font-inter text-[#334155]/70">Trend</span>
-                <div className="flex items-center gap-2">
-                  {moodTrend === 'improving' && <span className="text-green-500">📈 Improving</span>}
-                  {moodTrend === 'declining' && <span className="text-orange-500">📉 Needs attention</span>}
-                  {moodTrend === 'stable' && <span className="text-blue-500">➡️ Stable</span>}
+              {/* Energy Analysis */}
+              <div className="bg-white/20 backdrop-blur-sm p-8 rounded-3xl border border-white/30 shadow-lg">
+                <div className="flex items-center gap-3 mb-6">
+                  <Zap className="w-6 h-6 text-[#FFF6B3]" />
+                  <h3 className="font-sora font-semibold text-xl text-[#334155]">Energy Analysis</h3>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-inter text-[#334155]/70">7-day average</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">⚡</span>
+                      <span className="font-sora font-bold text-[#F59E0B]">{weeklyEnergyAvg}/10</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="font-inter text-[#334155]/70">Trend</span>
+                    <div className="flex items-center gap-2">
+                      {energyTrend === 'improving' && <span className="text-green-500">📈 Improving</span>}
+                      {energyTrend === 'declining' && <span className="text-orange-500">📉 Needs attention</span>}
+                      {energyTrend === 'stable' && <span className="text-blue-500">➡️ Stable</span>}
+                    </div>
+                  </div>
+                  
+                  <div className="w-full bg-gray-200 rounded-full h-3 mt-4">
+                    <div 
+                      className="bg-gradient-to-r from-[#FFF6B3] to-[#F59E0B] h-3 rounded-full transition-all duration-500"
+                      style={{ width: `${(weeklyEnergyAvg / 10) * 100}%` }}
+                    />
+                  </div>
                 </div>
               </div>
-              
-              <div className="w-full bg-gray-200 rounded-full h-3 mt-4">
-                <div 
-                  className="bg-gradient-to-r from-[#A5E3D8] to-[#8DD3C7] h-3 rounded-full transition-all duration-500"
-                  style={{ width: `${(weeklyMoodAvg / 10) * 100}%` }}
-                />
-              </div>
             </div>
+          </>
+        ) : (
+          /* Getting Started Section */
+          <div className="bg-white/20 backdrop-blur-sm p-8 rounded-3xl border border-white/30 shadow-lg mb-8 text-center">
+            <div className="text-6xl mb-6">🌱</div>
+            <h3 className="font-sora font-semibold text-2xl text-[#334155] mb-4">
+              Ready to start your journey?
+            </h3>
+            <p className="font-inter text-lg text-[#334155]/70 mb-6">
+              Take your first check-in to begin understanding your mental wellness patterns and get personalized insights from Mento AI.
+            </p>
           </div>
-          
-          {/* Energy Analysis */}
-          <div className="bg-white/20 backdrop-blur-sm p-8 rounded-3xl border border-white/30 shadow-lg">
-            <div className="flex items-center gap-3 mb-6">
-              <Zap className="w-6 h-6 text-[#FFF6B3]" />
-              <h3 className="font-sora font-semibold text-xl text-[#334155]">Energy Analysis</h3>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="font-inter text-[#334155]/70">7-day average</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">⚡</span>
-                  <span className="font-sora font-bold text-[#F59E0B]">{weeklyEnergyAvg}/10</span>
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <span className="font-inter text-[#334155]/70">Trend</span>
-                <div className="flex items-center gap-2">
-                  {energyTrend === 'improving' && <span className="text-green-500">📈 Improving</span>}
-                  {energyTrend === 'declining' && <span className="text-orange-500">📉 Needs attention</span>}
-                  {energyTrend === 'stable' && <span className="text-blue-500">➡️ Stable</span>}
-                </div>
-              </div>
-              
-              <div className="w-full bg-gray-200 rounded-full h-3 mt-4">
-                <div 
-                  className="bg-gradient-to-r from-[#FFF6B3] to-[#F59E0B] h-3 rounded-full transition-all duration-500"
-                  style={{ width: `${(weeklyEnergyAvg / 10) * 100}%` }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
+        )}
         
         {/* Insights & Recommendations */}
         <div className="grid md:grid-cols-2 gap-6 mb-8">
@@ -238,7 +267,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           <div className="bg-[#FFF6B3]/20 backdrop-blur-sm p-8 rounded-3xl border border-[#FFF6B3]/30 shadow-lg">
             <div className="flex items-start gap-3 mb-4">
               <Lightbulb className="w-6 h-6 text-[#F59E0B] mt-1" />
-              <h3 className="font-sora font-semibold text-xl text-[#334155]">💡 Weekly Insight</h3>
+              <h3 className="font-sora font-semibold text-xl text-[#334155]">💡 {hasData ? 'Weekly Insight' : 'Getting Started'}</h3>
             </div>
             <p className="font-inter text-lg text-[#334155] leading-relaxed">
               {getInsightMessage()}
@@ -271,7 +300,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
               <p className="font-inter text-sm text-[#334155]/70">
                 {user.lastCheckIn 
                   ? `${user.lastCheckIn.mood}/10 mood, ${user.lastCheckIn.energy}/10 energy`
-                  : 'No recent check-ins'
+                  : 'No check-ins yet'
                 }
               </p>
             </div>

@@ -5,29 +5,40 @@ import FloatingBlobs from './FloatingBlobs';
 
 interface SettingsProps {
   user: UserType;
-  setUser: (user: UserType) => void;
-  onNavigate: (view: 'dashboard' | 'landing') => void;
+  updateUser: (updates: Partial<UserType>) => Promise<void>;
+  onNavigate: (view: 'dashboard') => void;
+  onSignOut: () => Promise<void>;
 }
 
-const Settings: React.FC<SettingsProps> = ({ user, setUser, onNavigate }) => {
+const Settings: React.FC<SettingsProps> = ({ user, updateUser, onNavigate, onSignOut }) => {
   const [name, setName] = useState(user.name);
   const [reminderTime, setReminderTime] = useState(user.dailyReminderTime);
   const [mode, setMode] = useState<'solo' | 'team'>(user.mode);
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  const handleSave = () => {
-    setUser({
-      ...user,
-      name,
-      dailyReminderTime: reminderTime,
-      mode
-    });
+  const handleSave = async () => {
+    if (isUpdating) return;
+    
+    setIsUpdating(true);
+    try {
+      await updateUser({
+        name,
+        dailyReminderTime: reminderTime,
+        mode
+      });
+    } catch (error) {
+      console.error('Error updating user:', error);
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const handleExport = () => {
     const data = {
       moodHistory: user.moodHistory,
       energyHistory: user.energyHistory,
-      checkIns: user.lastCheckIn ? [user.lastCheckIn] : []
+      checkIns: user.lastCheckIn ? [user.lastCheckIn] : [],
+      journalEntries: user.journalEntries
     };
     
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -39,14 +50,13 @@ const Settings: React.FC<SettingsProps> = ({ user, setUser, onNavigate }) => {
     URL.revokeObjectURL(url);
   };
 
-  const handleReset = () => {
-    if (confirm('Are you sure you want to reset all your insights? This cannot be undone.')) {
-      setUser({
-        ...user,
-        moodHistory: [],
-        energyHistory: [],
-        lastCheckIn: null
-      });
+  const handleSignOutClick = async () => {
+    if (confirm('Are you sure you want to sign out?')) {
+      try {
+        await onSignOut();
+      } catch (error) {
+        console.error('Error signing out:', error);
+      }
     }
   };
 
@@ -126,7 +136,8 @@ const Settings: React.FC<SettingsProps> = ({ user, setUser, onNavigate }) => {
                 <div className="flex gap-3">
                   <button 
                     onClick={() => { setMode('solo'); handleSave(); }}
-                    className={`px-6 py-3 rounded-2xl font-inter font-medium transition-all duration-300 ${
+                    disabled={isUpdating}
+                    className={`px-6 py-3 rounded-2xl font-inter font-medium transition-all duration-300 disabled:opacity-50 ${
                       mode === 'solo' 
                         ? 'bg-[#A5E3D8] text-[#334155] shadow-md' 
                         : 'bg-white/30 text-[#334155]/70 hover:bg-white/50'
@@ -136,7 +147,8 @@ const Settings: React.FC<SettingsProps> = ({ user, setUser, onNavigate }) => {
                   </button>
                   <button 
                     onClick={() => { setMode('team'); handleSave(); }}
-                    className={`px-6 py-3 rounded-2xl font-inter font-medium transition-all duration-300 ${
+                    disabled={isUpdating}
+                    className={`px-6 py-3 rounded-2xl font-inter font-medium transition-all duration-300 disabled:opacity-50 ${
                       mode === 'team' 
                         ? 'bg-[#A5E3D8] text-[#334155] shadow-md' 
                         : 'bg-white/30 text-[#334155]/70 hover:bg-white/50'
@@ -181,14 +193,7 @@ const Settings: React.FC<SettingsProps> = ({ user, setUser, onNavigate }) => {
                 className="w-full p-4 bg-white/30 rounded-2xl font-inter text-[#334155] flex items-center gap-3 hover:bg-white/50 transition-all duration-300"
               >
                 <Download className="w-5 h-5" />
-                Export mood history
-              </button>
-              <button 
-                onClick={handleReset}
-                className="w-full p-4 bg-[#FFDBD3]/30 rounded-2xl font-inter text-[#334155] flex items-center gap-3 hover:bg-[#FFDBD3]/50 transition-all duration-300"
-              >
-                <RotateCcw className="w-5 h-5" />
-                Reset insights
+                Export your data
               </button>
             </div>
           </div>
@@ -196,11 +201,11 @@ const Settings: React.FC<SettingsProps> = ({ user, setUser, onNavigate }) => {
           {/* Logout */}
           <div className="text-center">
             <button 
-              onClick={() => onNavigate('landing')}
+              onClick={handleSignOutClick}
               className="group bg-white/30 text-[#334155] px-8 py-4 rounded-2xl font-inter font-medium border border-white/30 hover:bg-white/50 transition-all duration-300 hover:scale-105 flex items-center gap-3 mx-auto"
             >
               <LogOut className="w-5 h-5" />
-              🚪 Log out
+              🚪 Sign out
             </button>
           </div>
         </div>
