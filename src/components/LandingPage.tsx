@@ -42,6 +42,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
     } catch (error: any) {
       console.error('Error joining team via invite:', error);
       alert(error.message || 'Failed to join team via invite link');
+      // Clear the invite from URL even on error
+      window.history.replaceState({}, '', '/');
     } finally {
       setIsLoading(false);
     }
@@ -50,6 +52,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
   const handleJoinTeam = async () => {
     if (!roomCodeInput.trim()) {
       setJoinError('Please enter a room code');
+      return;
+    }
+
+    if (roomCodeInput.trim().length !== 6) {
+      setJoinError('Room code must be 6 characters long');
       return;
     }
 
@@ -62,6 +69,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
       setRoomCodeInput('');
       onNavigate('team');
     } catch (error: any) {
+      console.error('Join team error:', error);
       setJoinError(error.message || 'Failed to join team');
     } finally {
       setIsLoading(false);
@@ -87,6 +95,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleRoomCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    setRoomCodeInput(value);
+    if (joinError) setJoinError('');
   };
 
   return (
@@ -175,24 +189,28 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
           <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md flex flex-col gap-4">
             <h4 className="font-sora font-semibold text-lg text-[#334155]">Join a Team</h4>
-            <p className="text-sm text-[#334155]/70">Enter the room code shared by your team</p>
+            <p className="text-sm text-[#334155]/70">Enter the 6-character room code shared by your team</p>
             <input
               type="text"
-              className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#A5E3D8] font-mono tracking-widest uppercase"
-              placeholder="Enter room code"
+              className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#A5E3D8] font-mono tracking-widest uppercase text-center text-lg"
+              placeholder="ABC123"
               value={roomCodeInput}
-              onChange={e => setRoomCodeInput(e.target.value.toUpperCase())}
+              onChange={handleRoomCodeChange}
               disabled={isLoading}
               maxLength={6}
+              autoComplete="off"
             />
-            {joinError && <div className="text-red-500 text-sm">{joinError}</div>}
+            <div className="text-xs text-[#334155]/60 text-center">
+              Room codes are 6 characters long (letters and numbers)
+            </div>
+            {joinError && <div className="text-red-500 text-sm text-center">{joinError}</div>}
             <div className="flex gap-2">
               <button
                 className="bg-[#A5E3D8] text-[#334155] px-4 py-2 rounded-lg font-inter font-medium flex-1 hover:bg-[#8DD3C7] disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={handleJoinTeam}
-                disabled={isLoading}
+                disabled={isLoading || roomCodeInput.length !== 6}
               >
-                {isLoading ? 'Joining...' : 'Join'}
+                {isLoading ? 'Joining...' : 'Join Team'}
               </button>
               <button
                 className="bg-gray-200 text-[#334155] px-4 py-2 rounded-lg font-inter font-medium flex-1 hover:bg-gray-300 disabled:opacity-50"

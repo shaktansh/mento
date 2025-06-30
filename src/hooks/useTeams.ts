@@ -186,36 +186,42 @@ export function useTeams(authUser: User | null) {
         throw new Error('Please enter a valid room code');
       }
 
-      // Find team by room code with better error handling
-      const { data: teamData, error: teamError } = await supabase
-        .from('teams')
-        .select('id, name, room_code, created_by')
-        .eq('room_code', cleanRoomCode)
-        .maybeSingle();
+      if (cleanRoomCode.length !== 6) {
+        throw new Error('Room code must be 6 characters long');
+      }
+
+      console.log('Attempting to join team with room code:', cleanRoomCode);
+
+      // Find team by room code using RPC function for better reliability
+      const { data: teamResult, error: teamError } = await supabase
+        .rpc('find_team_by_room_code', { code: cleanRoomCode });
 
       if (teamError) {
         console.error('Error finding team:', teamError);
         throw new Error('Error searching for team. Please try again.');
       }
 
-      if (!teamData) {
+      console.log('Team search result:', teamResult);
+
+      if (!teamResult || teamResult.length === 0) {
         throw new Error('Invalid room code. Please check the code and try again.');
       }
 
-      // Check if user is already a member
-      const { data: existingMember, error: memberCheckError } = await supabase
-        .from('team_members')
-        .select('id')
-        .eq('team_id', teamData.id)
-        .eq('user_id', authUser.id)
-        .maybeSingle();
+      const teamData = teamResult[0];
+
+      // Check if user is already a member using RPC function
+      const { data: isMember, error: memberCheckError } = await supabase
+        .rpc('is_user_team_member', { 
+          team_uuid: teamData.team_id, 
+          user_uuid: authUser.id 
+        });
 
       if (memberCheckError) {
         console.error('Error checking membership:', memberCheckError);
         throw new Error('Error checking team membership');
       }
 
-      if (existingMember) {
+      if (isMember) {
         throw new Error('You are already a member of this team');
       }
 
@@ -223,7 +229,7 @@ export function useTeams(authUser: User | null) {
       const { error: memberError } = await supabase
         .from('team_members')
         .insert({
-          team_id: teamData.id,
+          team_id: teamData.team_id,
           user_id: authUser.id,
           role: 'member'
         });
@@ -236,7 +242,12 @@ export function useTeams(authUser: User | null) {
       // Reload teams
       await loadUserTeams();
 
-      return teamData;
+      return {
+        id: teamData.team_id,
+        name: teamData.team_name,
+        room_code: teamData.team_room_code,
+        created_by: teamData.team_created_by
+      };
     } catch (error) {
       console.error('Error joining team:', error);
       throw error;
@@ -258,20 +269,19 @@ export function useTeams(authUser: User | null) {
         throw new Error('Invalid invite link or team no longer exists');
       }
 
-      // Check if user is already a member
-      const { data: existingMember, error: memberCheckError } = await supabase
-        .from('team_members')
-        .select('id')
-        .eq('team_id', teamData.id)
-        .eq('user_id', authUser.id)
-        .maybeSingle();
+      // Check if user is already a member using RPC function
+      const { data: isMember, error: memberCheckError } = await supabase
+        .rpc('is_user_team_member', { 
+          team_uuid: teamData.id, 
+          user_uuid: authUser.id 
+        });
 
       if (memberCheckError) {
         console.error('Error checking membership:', memberCheckError);
         throw new Error('Error checking team membership');
       }
 
-      if (existingMember) {
+      if (isMember) {
         throw new Error('You are already a member of this team');
       }
 
